@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block main %}
+<section class="intro">
+  <h1>Everyday essentials</h1>
+  <form class="search" method="get">
+    <label for="q">Find a product</label>
+    <div><input id="q" name="q" value="{{ query }}" maxlength="100" type="search" placeholder="Search by name"><button>Search</button></div>
+  </form>
+</section>
+<div class="grid">
+  {% for product in products %}
+  <article>
+    <h2>{{ product.name }}</h2>
+    <p>{{ product.description }}</p>
+    <div class="product-meta"><strong>{{ product.price | money }}</strong><span>{{ product.stock }} in stock</span></div>
+    {% if product.stock > 0 and (not g.user or g.user.role == 'customer') %}
+      <a class="button" href="{{ url_for('checkout', product_id=product.id) }}">Buy {{ product.name }}</a>
+    {% endif %}
+  </article>
+  {% else %}
+  <p>No products match your search.</p>
+  {% endfor %}
+</div>
+{% endblock %}

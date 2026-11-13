@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block title %}Checkout{% endblock %}
+{% block main %}
+<section class="panel">
+  <h1>Checkout</h1>
+  <h2>{{ product.name }}</h2>
+  <p>{{ product.price | money }} per item · {{ product.stock }} in stock</p>
+  <p>This is a simulated checkout. No payment is collected.</p>
+  {% if product.stock %}
+  <form method="post" class="stack">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <label>Quantity <input type="number" name="quantity" value="1" min="1" max="{{ [99, product.stock] | min }}" required></label>
+    <button>Place order</button>
+  </form>
+  {% else %}<p>Sold out.</p>{% endif %}
+</section>
+{% endblock %}

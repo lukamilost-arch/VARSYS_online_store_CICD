@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block title %}Order #{{ order.id }}{% endblock %}
+{% block main %}
+<section class="panel">
+  <a href="{{ url_for('orders') }}">Back to my orders</a>
+  <h1>Order #{{ order.id }}</h1>
+  <p>{{ order.created_at }} UTC</p>
+  <dl>
+    <dt>Product</dt><dd>{{ order.product_name }}</dd>
+    <dt>Unit price</dt><dd>{{ order.unit_price | money }}</dd>
+    <dt>Quantity</dt><dd>{{ order.quantity }}</dd>
+    <dt>Total</dt><dd><strong>{{ (order.unit_price * order.quantity) | money }}</strong></dd>
+  </dl>
+</section>
+{% endblock %}

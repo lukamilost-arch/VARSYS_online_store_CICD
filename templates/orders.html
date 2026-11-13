@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block title %}My orders{% endblock %}
+{% block main %}
+<h1>My orders</h1>
+{% if orders %}
+<ul class="order-list">
+  {% for order in orders %}
+  <li><a href="{{ url_for('order_detail', order_id=order.id) }}">Order #{{ order.id }} · {{ order.product_name }}</a><strong>{{ (order.unit_price * order.quantity) | money }}</strong></li>
+  {% endfor %}
+</ul>
+{% else %}
+<p>You have no orders yet.</p>
+<a class="button" href="{{ url_for('catalog') }}">Browse products</a>
+{% endif %}
+{% endblock %}
