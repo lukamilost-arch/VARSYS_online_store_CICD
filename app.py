@@ -183,7 +183,7 @@ def create_app(config=None):
     @require_role("customer")
     def order_detail(order_id):
         order = db().execute(
-            "SELECT * FROM orders WHERE id = ? AND user_id = ?", (order_id, g.user["id"])
+            "SELECT * FROM orders WHERE id = ?", (order_id,)
         ).fetchone()
         if order is None:
             abort(404)
