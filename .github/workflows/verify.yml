@@ -1,0 +1,143 @@
+name: Fieldstore verification
+
+on:
+  pull_request:
+    branches: [master]
+  push:
+    branches: [master]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  pytest:
+    name: Pytest
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: python -m pip install -r requirements-dev.txt
+
+      - name: Run tests
+        run: python -m pytest -q --junitxml=pytest-report.xml
+
+      - name: Upload test report
+        if: ${{ !cancelled() && hashFiles('pytest-report.xml') != '' }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: pytest-report
+          path: pytest-report.xml
+          retention-days: 7
+
+  semgrep:
+    name: Semgrep CE
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - name: Scan Flask source
+        run: |
+          docker run --rm \
+            -v "$PWD:/src" \
+            -w /src \
+            semgrep/semgrep \
+            semgrep scan --config auto --error \
+            --json-output=semgrep-report.json app.py
+
+      - name: Upload Semgrep report
+        if: ${{ !cancelled() && hashFiles('semgrep-report.json') != '' }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: semgrep-report
+          path: semgrep-report.json
+          retention-days: 7
+
+  trivy:
+    name: Trivy dependency scan
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - name: Scan Python dependencies
+        run: |
+          docker run --rm \
+            -v "$PWD:/src:ro" \
+            aquasec/trivy:latest fs \
+            --scanners vuln \
+            --severity HIGH,CRITICAL \
+            --exit-code 1 \
+            /src/requirements.txt | tee trivy-report.txt
+
+      - name: Upload Trivy report
+        if: ${{ !cancelled() && hashFiles('trivy-report.txt') != '' }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: trivy-report
+          path: trivy-report.txt
+          retention-days: 7
+
+  zap:
+    name: ZAP baseline scan
+    needs: pytest
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - name: Start Fieldstore
+        run: docker compose up --build --wait --wait-timeout 60
+
+      - name: Check the live app
+        run: curl --fail --silent --show-error http://127.0.0.1:8000/health
+
+      - name: Run ZAP baseline scan
+        run: |
+          install -d -m 0777 zap-reports
+          docker run --rm --network host \
+            -v "$PWD/zap-reports:/zap/wrk:rw" \
+            ghcr.io/zaproxy/zaproxy:stable \
+            zap-baseline.py \
+            -t http://127.0.0.1:8000 \
+            -r zap-report.html \
+            -I
+
+      - name: Upload ZAP report
+        if: ${{ !cancelled() && hashFiles('zap-reports/zap-report.html') != '' }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: zap-report
+          path: zap-reports/zap-report.html
+          retention-days: 7
+
+      - name: Show application logs on failure
+        if: ${{ failure() }}
+        run: docker compose logs --no-color
+
+      - name: Stop the test environment
+        if: ${{ always() }}
+        run: docker compose down --volumes
